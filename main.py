@@ -41,64 +41,73 @@ def format_email_content(tarefa: dict | None):
         body_parts = []
         mensagem_especial = tarefa.get('Mensagem_Especial')
 
+        # Adicionamos a mensagem especial, se existir
         if pd.notna(mensagem_especial) and str(mensagem_especial).strip():
-            body_parts.append(f"*-- MENSAGEM ESPECIAL --*\n{str(mensagem_especial).strip()}\n\n")
+            body_parts.append(f"<p><b>-- MENSAGEM ESPECIAL --</b><br><b>{str(mensagem_especial).strip()}</b></p>")
 
-        body_parts.append("Bom dia!\n")
-        body_parts.append("Hoje, temos as seguintes atividades para estudarmos para nosso sonhado Intercâmbio:\n\n")
+        # Usamos <p> para parágrafos, que criam espaços automaticamente
+        body_parts.append("<br><p>Bom dia!</p>")
+        body_parts.append("<p>Hoje, temos as seguintes atividades para estudarmos para nosso sonhado Intercâmbio:</p>")
 
-
-        #! -- Lógica x95
-
+        # Criamos uma lista HTML (<ul>) para as aulas
         aulas_do_dia = parse_task_list(tarefa.get('TODO!'))
-        print(aulas_do_dia)
         if aulas_do_dia:
-            body_parts.append("*Aulas do dia:*\n")
+            body_parts.append("<p><b>Aulas do dia:</b></p>")
+            body_parts.append("<ul>")
             for aula in aulas_do_dia:
-                print(aula)
-                body_parts.append(f"- {aula}\n")
-            body_parts.append("\n")
+                body_parts.append(f"<li>{aula}</li>") # <li> cria o item da lista
+            body_parts.append("</ul>")
 
-
+        # Criamos outra lista HTML para o Anki
         anki_tasks = parse_task_list(tarefa.get('Anki'))
         if anki_tasks:
-            body_parts.append("*E para a revisão no Anki:*\n")
+            body_parts.append("<p><b>E para a revisão no Anki:</b></p>")
+            body_parts.append("<ul>")
             for task in anki_tasks:
-                body_parts.append(f"- {task}\n")
-            body_parts.append("\n")
+                body_parts.append(f"<li>{task}</li>")
+            body_parts.append("</ul>")
 
-        body_parts.append(f"{mensagem_jlpt}\n")
-        body_parts.append(f"{mensagem_japao}\n")
+        # Adicionamos as contagens regressivas em parágrafos
+        body_parts.append(f"<p>{mensagem_jlpt}</p>") # <i> para itálico
+        body_parts.append(f"<p>{mensagem_japao}</p>")
 
-        body = "".join(body_parts)
-        print(body)
+        # Montamos o corpo final do e-mail
+        # Envolvemos tudo em tags <html> e <body> para garantir que seja lido como HTML
+        body = f"<html><body style='font-family: Arial, sans-serif; line-height: 1.5;'>{''.join(body_parts)}</body></html>"
 
         return subject, body
 
-
     else:
         subject = "🇯🇵 Sem atividades de japonês por Hoje!"
+        # Também formatamos a mensagem de "descanso" como HTML
         body =f"""
-        Não atividades de japonês para hoje!
-        Podemos descansar.
-
-        {mensagem_jlpt}
-        {mensagem_japao}
+        <html>
+        <body style='font-family: Arial, sans-serif; line-height: 1.5;'>
+            <p>Não há atividades de japonês para hoje!</p>
+            <p>Podemos descansar.</p>
+            <br>
+            <p><i>{mensagem_jlpt}</i></p>
+            <p><i>{mensagem_japao}</i></p>
+        </body>
+        </html>
         """
+        return subject, body
+    
 
-
-    return subject, body
-
+    
 
 def main():
     load_dotenv()
 
     SENDER = os.getenv('MEU_EMAIL')
     PASSWORD = os.getenv('MINHA_SENHA')
-    RECEIVER = os.getenv('EMAIL_RECEIVER')
-    if not all([SENDER, PASSWORD, RECEIVER]):
+    RECEIVER_STRING = os.getenv('EMAIL_RECEIVER') 
+
+    if not all([SENDER, PASSWORD, RECEIVER_STRING]):
         print("ERRO: Configure as variáveis de ambiente MEU_EMAIL, MINHA_SENHA_DE_APP e EMAIL_RECEIVER.")
         return
+    
+    receiver_list = [email.strip() for email in RECEIVER_STRING.split(',')]
     
     tarefa_de_hoje = fetch_row()
     assunto, corpo = format_email_content(tarefa_de_hoje)
@@ -106,7 +115,7 @@ def main():
     print(corpo)
 
     email_service = EmailConnector(email_sender=SENDER, email_password=PASSWORD)
-    email_service.send_email(receiver=RECEIVER, subject=assunto, body=corpo)
+    email_service.send_email(receiver_list=receiver_list, subject=assunto, body=corpo)
     print("Email enviado com sucesso!")
 
 
